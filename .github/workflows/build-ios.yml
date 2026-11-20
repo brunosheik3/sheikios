@@ -1,0 +1,48 @@
+name: Build iOS interface
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Unpack project source
+        run: unzip -q SheikUI-source.zip -d source
+
+      - name: Build unsigned iOS app
+        working-directory: source
+        run: >-
+          xcodebuild
+          -project SheikUI.xcodeproj
+          -scheme SheikUI
+          -configuration Release
+          -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          CODE_SIGN_IDENTITY=''
+          SYMROOT="$PWD/build"
+          build
+
+      - name: Package IPA
+        run: |
+          mkdir -p package/Payload
+          cp -R source/build/Release-iphoneos/SheikUI.app package/Payload/
+          ditto -c -k --sequesterRsrc --keepParent package SheikUI-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SheikUI-unsigned-ipa
+          path: SheikUI-unsigned.ipa
+          if-no-files-found: error
